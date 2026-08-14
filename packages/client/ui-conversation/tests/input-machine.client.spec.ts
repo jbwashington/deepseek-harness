@@ -423,6 +423,24 @@ describe('input-machine: undo / redo', () => {
     expect(m.state.draft).toBe('')
   })
 
+  it('the merge window anchors at the run start: steady typing splits once the run outgrows it', () => {
+    let t = 0
+    const m = new InputMachine({ mergeWindowMs: 1000, now: () => t })
+    // Six chars, 300ms apart: every inter-key gap is inside the window, but
+    // the run crosses the window from its FIRST keystroke at t=1200 — a
+    // rolling window would coalesce the whole message and one undo would
+    // wipe it all.
+    const draft = 'abcdef'
+    for (let i = 0; i < draft.length; i++) {
+      t = i * 300
+      m.dispatch({ type: 'draft-changed', draft: draft.slice(0, i + 1), editRange: { start: i, end: i, insertedLength: 1 } })
+    }
+    m.dispatch({ type: 'undo' })
+    expect(m.state.draft).toBe('abcd') // chars at t=1200,1500 form the second transaction
+    m.dispatch({ type: 'undo' })
+    expect(m.state.draft).toBe('')
+  })
+
   it('non-contiguous or multi-char edits never merge into a typing run', () => {
     const m = new InputMachine()
     m.dispatch({ type: 'draft-changed', draft: 'a', editRange: { start: 0, end: 0, insertedLength: 1 } })

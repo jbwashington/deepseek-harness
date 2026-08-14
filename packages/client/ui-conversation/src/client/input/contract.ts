@@ -199,7 +199,12 @@ export interface PasteAttemptState {
  * always coalesces until a non-typing transaction intervenes.
  */
 export interface InputMachineOptions {
-  /** Single-char typing undo-merge window in ms (default 1000). */
+  /**
+   * Single-char typing undo-merge window in ms (default 1000), measured from
+   * the open run's FIRST keystroke: contiguous typing older than the window
+   * opens a new transaction, so one undo never reverts more than one
+   * window's worth of typing.
+   */
   readonly mergeWindowMs?: number
   /** Monotonic clock for typing-merge decisions (default: constant 0). */
   readonly now?: () => number

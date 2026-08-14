@@ -241,13 +241,17 @@ export class InputMachine {
     if (draft === this.draft) return []
     const range = editRange ?? diffEdit(this.draft, draft)
     // Single-char typing coalesces into the open run while contiguous and
-    // inside the merge window; anything else opens its own transaction.
+    // inside the merge window; anything else opens its own transaction. The
+    // window anchors at the run's FIRST keystroke (`run.at` is not refreshed
+    // per char), so one transaction holds at most mergeWindowMs of typing —
+    // a rolling window would coalesce an entire steadily-typed message into
+    // one unit and a single undo would wipe it all.
     const typing = range.start === range.end && range.insertedLength === 1
     const at = this.now()
     const run = this.typingRun
     const merges = typing && run !== undefined && run.end === range.start && at - run.at <= this.mergeWindowMs
     if (!merges) this.pushTxn({ start: range.start, end: range.end })
-    this.typingRun = typing ? { end: range.start + 1, at } : undefined
+    this.typingRun = typing ? { end: range.start + 1, at: merges && run !== undefined ? run.at : at } : undefined
     this.reconcile(range)
     this.adopt(draft)
     this.watchClaim()

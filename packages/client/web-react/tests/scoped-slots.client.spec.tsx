@@ -336,12 +336,40 @@ describe('child outlets and the renderSlot binding', () => {
     const { view } = mountRoot(h, { 'k.list': { kind: 'list', scope: 'root' } },
       renderSlot => renderSlot('k.list', {}))
     spy.mockRestore()
-    expect(view.container.textContent).toBe('alive')
-    expect(view.container.querySelector('[data-slot-error]')).not.toBeNull()
+    // The sibling survives; the crashed cell shows its visible crash face.
+    expect(view.container.textContent).toContain('alive')
+    const face = view.container.querySelector('[data-slot-error]')
+    expect(face).not.toBeNull()
+    expect(face?.textContent).toContain('failed to render')
   })
 })
 
 describe('chain outlets and the renderSlotChain binding', () => {
+  it('the crash face Restore remounts a chain entry in place (chain entries never abdicate)', () => {
+    const h = makeHost()
+    h.declare('k.chain', CHAIN_ROOT)
+    let crashing = true
+    h.add('k.chain', chainEntryOf({
+      component: () => {
+        if (crashing) throw new Error('transient boom')
+        return <span>recovered</span>
+      },
+      select: () => ({}),
+    }))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { view } = mountChainRoot(h, { 'k.chain': CHAIN_ROOT },
+      renderSlotChain => renderSlotChain('k.chain', {}))
+    spy.mockRestore()
+    // The transient crash shows the visible face with its in-place recovery.
+    const face = view.container.querySelector('[data-slot-error]')
+    expect(face).not.toBeNull()
+    expect(face?.textContent).toContain('failed to render')
+    crashing = false
+    fireEvent.click(view.getByRole('button', { name: 'Restore' }))
+    expect(view.container.textContent).toBe('recovered')
+    expect(view.container.querySelector('[data-slot-error]')).toBeNull()
+  })
+
   it('elects the first non-null selector in order, injects matched, and skips decliners without mounting them', () => {
     const h = makeHost()
     h.declare('k.chain', CHAIN_ROOT)
@@ -936,10 +964,12 @@ describe('inject: execution point, parameter derivation, cache granularity', () 
     const { view } = mountRoot(h, { 'k.list': { kind: 'list', scope: 'root' } },
       renderSlot => <main>{renderSlot('k.list', {})}</main>)
     spy.mockRestore()
-    // The failing entry blacks out alone; the sibling and the tree above survive.
+    // The failing entry shows its crash face alone; the sibling and the tree above survive.
     expect(view.container.querySelector('main')).not.toBeNull()
-    expect(view.container.textContent).toBe('alive')
-    expect(view.container.querySelector('[data-slot-error]')).not.toBeNull()
+    expect(view.container.textContent).toContain('alive')
+    const face = view.container.querySelector('[data-slot-error]')
+    expect(face).not.toBeNull()
+    expect(face?.textContent).toContain('failed to render')
   })
 
   it('merges kit, inject, and owner props with owner winning', () => {

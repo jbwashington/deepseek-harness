@@ -12,6 +12,15 @@ import css from './ConversationRoot.module.css'
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
 
+/**
+ * Upper bound on the settling hide (ms). Settling exists to suppress a
+ * hero/docked layout flash during an ordinary session replay, which lands in
+ * well under a second; a slow or stalled open must not keep the composer
+ * invisible indefinitely — past this bound the seat shows in the docked
+ * posture and corrects itself when the open lands.
+ */
+const SETTLING_MAX_MS = 3000
+
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   renderSlot, renderSlotChain, selectWorkspace, t,
@@ -74,8 +83,21 @@ export function ConversationRoot({
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
-  const settling = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+  const settlingHold = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
     && summaryBlank !== true
+  // Bounded hide: an open that outlives SETTLING_MAX_MS (cold server, huge
+  // replay, stalled stream) stops hiding the composer — an invisible input
+  // with no affordance is a worse failure than a one-off layout snap.
+  const [settleExpired, setSettleExpired] = useState(false)
+  useEffect(() => {
+    if (!settlingHold) {
+      setSettleExpired(false)
+      return
+    }
+    const timer = setTimeout(() => { setSettleExpired(true) }, SETTLING_MAX_MS)
+    return () => { clearTimeout(timer) }
+  }, [settlingHold])
+  const settling = settlingHold && !settleExpired
   const hero = sessionId === undefined
     || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
   const zone: InputZone | undefined =

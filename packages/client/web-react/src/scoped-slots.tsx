@@ -304,6 +304,55 @@ function entryKeyOf(entry: StoredEntry): number {
   return key
 }
 
+/** Shared inline styling for every crash face: quiet, theme-token driven, self-contained. */
+const CRASH_FACE_STYLE: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '6px 10px',
+  borderRadius: 8,
+  background: 'var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12))',
+  color: 'var(--dsw-alias-label-secondary, inherit)',
+  fontSize: 12,
+  lineHeight: '18px',
+}
+
+const CRASH_FACE_BUTTON_STYLE: React.CSSProperties = {
+  padding: '1px 8px',
+  border: '1px solid currentColor',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  cursor: 'pointer',
+}
+
+/**
+ * Visible crash face shared by the entry boundary and the dry-cell outlets.
+ * A crashed region must stay discoverable and recoverable in place — a blank
+ * void reads as "the panel disappeared" and hides that anything failed at
+ * all. `onRetry` remounts a boundary's children; without it (a dry cell,
+ * where every registration abdicated) the only recovery is a reload.
+ */
+function SlotCrashFace({ slotKey, onRetry }: { slotKey: string; onRetry?: () => void }) {
+  return (
+    <div data-slot-error={slotKey} role="alert" style={CRASH_FACE_STYLE}>
+      <span>This panel failed to render ({slotKey}).</span>
+      {onRetry !== undefined
+        ? <button type="button" style={CRASH_FACE_BUTTON_STYLE} onClick={onRetry}>Restore</button>
+        : (
+          <button
+            type="button"
+            style={CRASH_FACE_BUTTON_STYLE}
+            onClick={() => { window.location.reload() }}
+          >
+            Reload
+          </button>
+        )}
+    </div>
+  )
+}
+
 /**
  * Per-entry isolation: one registrant crashing (component render or inject
  * factory) must not take down siblings. Assembly errors (missing providers)
@@ -312,7 +361,9 @@ function entryKeyOf(entry: StoredEntry): number {
  * seam); for shadowing kinds the report abdicates the entry, the outlet
  * re-renders onto the cell's next survivor, and this boundary's crash face
  * only shows until that re-render lands (permanently once the cell is dry —
- * the outlet then owns the crash face).
+ * the outlet then owns the crash face). The face is visible and offers an
+ * in-place Restore (state reset remounts the children), so a transient
+ * crash never leaves a permanently blank region.
  */
 class SlotErrorBoundary extends Component<
   { slotKey: string; onEntryError: (error: unknown) => void; children: ReactNode }, { failed: boolean }
@@ -327,7 +378,9 @@ class SlotErrorBoundary extends Component<
     this.props.onEntryError(error)
   }
   override render(): ReactNode {
-    if (this.state.failed) return <div data-slot-error={this.props.slotKey} />
+    if (this.state.failed) {
+      return <SlotCrashFace slotKey={this.props.slotKey} onRetry={() => { this.setState({ failed: false }) }} />
+    }
     return this.props.children
   }
 }
@@ -756,7 +809,7 @@ function renderOutletContent(
   // A cell whose every registration abdicated keeps the crash face: the
   // shadowing collapse ran out of survivors, which is a failure state, not
   // the owner's natural-empty fallback.
-  const deadCell = () => <div data-slot-error={slotKey} />
+  const deadCell = () => <SlotCrashFace slotKey={slotKey} />
 
   if (spec.kind === 'single') {
     const entry = host.entriesOfSlot(slotKey)[0]
@@ -845,7 +898,7 @@ function renderOutletContent(
     <>
       {list.map((item, i) => item.entry !== undefined
         ? guarded(item.entry, `e${entryKeyOf(item.entry)}`)
-        : <div data-slot-error={slotKey} key={`x${item.id ?? i}`} />)}
+        : <SlotCrashFace slotKey={slotKey} key={`x${item.id ?? i}`} />)}
     </>
   )
 }
@@ -863,7 +916,7 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
     // Registrations exist but every one abdicated: the shadowing collapse ran
     // dry, so the crash face replaces the tree (registered-but-broken is a
     // crash, not the boot-order assembly failure below).
-    if (host.entriesOf('root').length > 0) return <div data-slot-error="root" />
+    if (host.entriesOf('root').length > 0) return <SlotCrashFace slotKey="root" />
     throw new SlotAssemblyError("renderSlot('root') before any 'root' registration (boot order)")
   }
   // Same anchor contract as SlotOutlet: 'root' is a slot like any other, and

@@ -400,6 +400,22 @@ describe('ConversationRoot resident composer', () => {
     expect(root?.getAttribute('data-phase')).toBe('settling')
   })
 
+  it('settling hide is bounded: a stalled open stops hiding the composer after the cap', () => {
+    vi.useFakeTimers()
+    try {
+      const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true, openState: 'loading' }))
+      const phase = () => b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')
+      expect(phase()).toBe('settling')
+      // An open that never lands must not keep the composer invisible: past
+      // the bound the seat shows in the docked posture instead.
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(phase()).toBe('active')
+      expect(b.view.getByRole('textbox')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('startup auto-selection: a summary-proven blank session opens straight into the hero', () => {
     const b = mount(
       conversationSnapshot({ composerPhase: 'blank', blank: true, openState: 'loading' }),
