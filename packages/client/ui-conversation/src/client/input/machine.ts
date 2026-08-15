@@ -249,9 +249,11 @@ export class InputMachine {
     const typing = range.start === range.end && range.insertedLength === 1
     const at = this.now()
     const run = this.typingRun
-    const merges = typing && run !== undefined && run.end === range.start && at - run.at <= this.mergeWindowMs
-    if (!merges) this.pushTxn({ start: range.start, end: range.end })
-    this.typingRun = typing ? { end: range.start + 1, at: merges && run !== undefined ? run.at : at } : undefined
+    const continuingRun = typing && run !== undefined && run.end === range.start && at - run.at <= this.mergeWindowMs
+      ? run
+      : undefined
+    if (continuingRun === undefined) this.pushTxn({ start: range.start, end: range.end })
+    this.typingRun = typing ? { end: range.start + 1, at: continuingRun?.at ?? at } : undefined
     this.reconcile(range)
     this.adopt(draft)
     this.watchClaim()
