@@ -200,6 +200,44 @@ describe('real Loader composition', () => {
     await expect(request(port, '/probe')).rejects.toThrow()
   })
 
+  it('names the fiber holding a taken seat, and reports one a disposed fiber leaked', { timeout: 60_000 }, async () => {
+    const loaded = await loadComposition()
+    const server = loaded.webServer
+
+    // Two plugins claiming one path and one plugin claiming it twice produce
+    // the same rejection, so the holder's identity is what tells them apart.
+    const live = loaded.plugin({
+      name: 'live-holder',
+      inject: ['webServer'],
+      apply(ctx) {
+        ctx.effect(() => ctx.webServer.register({ kind: 'prefix', path: '/held', handler: () => {} }))
+      },
+    })
+    await live.await()
+    expect(() => server.register({ kind: 'prefix', path: '/held', handler: () => {} }))
+      .toThrow('(held by live-holder)')
+
+    // The effect rode the fiber, so unloading the holder frees the seat.
+    await live.dispose()
+    server.register({ kind: 'prefix', path: '/held', handler: () => {} })()
+
+    // The leak: a registration whose disposer the plugin dropped outlives its
+    // own fiber, and nothing can reclaim the path for the rest of the process.
+    // The rejection has to say that, because "stop the holder" cannot fix it.
+    const leaky = loaded.plugin({
+      name: 'leaky-holder',
+      inject: ['webServer'],
+      apply(ctx) {
+        ctx.webServer.register({ kind: 'prefix', path: '/leaked', handler: (_req, res) => { res.writeHead(200); res.end('GHOST') } })
+      },
+    })
+    await leaky.await()
+    await leaky.dispose()
+    expect(await request(server.port, '/leaked')).toMatchObject({ status: 200, body: 'GHOST' })
+    expect(() => server.register({ kind: 'prefix', path: '/leaked', handler: () => {} }))
+      .toThrow('a disposed fiber that dropped this disposer')
+  })
+
   it('fails the fiber when the port is already taken (fail-loud at activation)', { timeout: 60_000 }, async () => {
     const first = await loadComposition()
     const takenPort = first.webServer.port

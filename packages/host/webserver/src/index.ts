@@ -13,6 +13,7 @@ import type { IncomingMessage, ServerResponse, Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 
 declare module '@deepseek-ai/cordis' {
@@ -65,6 +66,12 @@ export class WebServer extends Service {
   private readonly exact = new Map<string, WebRoute>()
   private readonly prefixes = new Map<string, WebRoute>()
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
+  /**
+   * The fiber holding each claimed seat, keyed by the seat phrase a collision
+   * prints. Every claim and release passes through {@link claim}, so this map
+   * has exactly the seats the route tables and the fallback slot do.
+   */
+  private readonly holders = new Map<string, Fiber>()
   private readonly upgradedSockets = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
   private fallback: WebRoute['handler'] | undefined
@@ -86,18 +93,48 @@ export class WebServer extends Service {
   }
 
   /**
+   * Take one seat or reject with the holder's identity.
+   *
+   * A collision is a misconfiguration, but which one depends on the holder:
+   * another live plugin claimed the seat first, or a plugin that dropped this
+   * disposer left the seat claimed past its own teardown. The two need opposite
+   * fixes, and the caller cannot tell them apart from the seat name alone, so
+   * the rejection names the holding fiber and whether it is still alive.
+   * @param seat - the seat phrase, unique per claim and printed on collision.
+   * @param collision - the rejection message, which the holder clause extends.
+   * @returns the release freeing the seat for a later claim.
+   * @throws Error naming the seat and its holder when the seat is taken.
+   */
+  private claim(seat: string, collision: string): () => void {
+    const holder = this.holders.get(seat)
+    if (holder !== undefined) {
+      // `uid === null` is cordis's own disposed test (vendor/cordis/src/fiber.ts
+      // derives FiberState.DISPOSED from it), read directly so this package
+      // needs no runtime mirror of a const enum.
+      const leaked = holder.uid === null
+      throw new Error(`${collision} (held by ${holder.name}${leaked
+        ? ', a disposed fiber that dropped this disposer — the seat stays claimed until the process restarts'
+        : ''})`)
+    }
+    this.holders.set(seat, this.ctx.fiber)
+    return () => { this.holders.delete(seat) }
+  }
+
+  /**
    * Register a named route. Duplicate (kind, path) throws — route patterns are
    * a composition-level contract, so a collision is a misconfiguration.
    * @param route - kind, path, and the owning handler.
    * @returns the disposer removing the route.
    */
   register(route: WebRoute): () => void {
+    const seat = `${route.kind} route "${route.path}"`
+    const release = this.claim(seat, `webserver: duplicate ${seat}`)
     const table = route.kind === 'exact' ? this.exact : this.prefixes
-    if (table.has(route.path)) {
-      throw new Error(`webserver: duplicate ${route.kind} route "${route.path}"`)
-    }
     table.set(route.path, route)
-    return () => { table.delete(route.path) }
+    return () => {
+      table.delete(route.path)
+      release()
+    }
   }
 
   /**
@@ -107,11 +144,13 @@ export class WebServer extends Service {
    * @returns the disposer removing the route.
    */
   registerUpgrade(route: WebUpgradeRoute): () => void {
-    if (this.upgrades.has(route.path)) {
-      throw new Error(`webserver: duplicate upgrade route "${route.path}"`)
-    }
+    const seat = `upgrade route "${route.path}"`
+    const release = this.claim(seat, `webserver: duplicate ${seat}`)
     this.upgrades.set(route.path, route)
-    return () => { this.upgrades.delete(route.path) }
+    return () => {
+      this.upgrades.delete(route.path)
+      release()
+    }
   }
 
   /**
@@ -123,11 +162,12 @@ export class WebServer extends Service {
    * @returns the disposer releasing the seat.
    */
   registerFallback(handler: WebRoute['handler']): () => void {
-    if (this.fallback !== undefined) {
-      throw new Error('webserver: fallback already registered')
-    }
+    const release = this.claim('fallback', 'webserver: fallback already registered')
     this.fallback = handler
-    return () => { this.fallback = undefined }
+    return () => {
+      this.fallback = undefined
+      release()
+    }
   }
 
   /**
