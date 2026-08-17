@@ -21,6 +21,8 @@ A refusal from `run` or `stop` names one of `definition-missing`, `host-half-fai
 
 A definition another session defined reads as absent rather than forbidden, so nothing leaks across sessions. `invoke` and `resolveRequestRun` carry no session at all: a component's call and a page's answer are page-global facts, not one session's.
 
+`ctx.cordisInspect` is process-global while the package that fills it is a row in an agent preset, so one provider id holds one registrant per mounted session. Registrants declaring the same id share it when their manifests match by value, the id answers from the newest registrant, and each disposer removes only its own — the id survives until the last session unloads. The newest answers rather than the first because a registration may capture the session context it was mounted under, and keeping the first would leave an unloaded session's context serving live ones. A manifest that differs from the live one is two providers claiming one name and still fails loud.
+
 Four forwarded events belong to this feature, declared by this package on its client-safe [`./types`](src/types.ts) subpath and allowlisted for delivery by [`@deepseek-ai/dsh-api-remotes`](../../api/remotes/README.md), which is what lets a browser reach them through `ctx.remote.$on`: `cordis/request-run` (`{requestId, agentId, id, name, purpose}` — metadata, never code), `cordis/request-run-resolved` (`{requestId, outcome}`), `dynamicCordisRunner/package` (`{id, name, rev}`), and `dynamicCordisRunner/retract` (`{id, rev}`). The last two are a symmetric pair announcing run state — every fresh start and every stop, whether or not the package has a browser half.
 
 ## Storage stance

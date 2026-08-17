@@ -21,8 +21,19 @@ Registry and cross-page router behind the two model-facing inspect tools.
 ```ts cordis-catalog
 /**
  * Register one Host provider.
+ *
+ * Registrants declaring the same id share it when their manifests match,
+ * which is what lets two Sessions mount the same preset: the id answers from
+ * the newest registrant, and each disposer removes only its own. A manifest
+ * that differs from the live one is a genuine conflict between two providers
+ * claiming one name, and still fails loud.
+ *
+ * The newest registrant answers rather than the first because a registration
+ * can capture the Session context it was mounted under; keeping the first
+ * would leave an unloaded Session's context serving live ones.
  * @param registration - manifest and local query handler.
- * @returns idempotent disposer.
+ * @returns idempotent disposer removing this registrant.
+ * @throws Error when a live registrant holds the id with a different manifest.
  */
 register(registration: HostCordisInspectProviderRegistration): () => void
 
@@ -62,7 +73,7 @@ resolveClientQuery( agent: Agent, requestId: CordisInspectRequestId, resolution:
 
 Types: [Agent](core.md)
 
-Source: [`packages/extensions/cordis-host-runner/src/inspect-registry.ts:46`](../../packages/extensions/cordis-host-runner/src/inspect-registry.ts)
+Source: [`packages/extensions/cordis-host-runner/src/inspect-registry.ts:49`](../../packages/extensions/cordis-host-runner/src/inspect-registry.ts)
 
 <a id="ctxdynamiccordisrunner--dynamiccordisrunnerservice"></a>
 
