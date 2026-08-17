@@ -21,6 +21,8 @@
 
 别的会话登记的定义读起来是不存在，而不是被禁止，因此不会跨会话泄漏任何东西。`invoke` 与 `resolveRequestRun` 完全不携带会话：组件的一次调用和页面的一次作答都是页面全局的事实，不属于某一个会话。
 
+`ctx.cordisInspect` 是进程全局的，而填充它的那个包是 agent preset 中的一行，因此一个 provider id 每挂载一个会话就多持有一个注册方。声明同一 id 的注册方，在其 manifest 按值相等时共享该 id；该 id 由最新的注册方作答，每个 disposer 只移除自己那一份——id 一直存活到最后一个会话卸载为止。由最新的而非最初的注册方作答，是因为一次注册可能捕获它挂载时所在的会话 context，保留最初的那份会让一个已卸载会话的 context 继续为存活的会话作答。与存活 manifest 不一致的 manifest，属于两个 provider 争用同一个名字，仍然响亮失败。
+
 本功能拥有四条转发事件，由本包在其 client-safe 的 [`./types`](src/types.ts) 子路径上声明，并由 [`@deepseek-ai/dsh-api-remotes`](../../api/remotes/README.md) 的白名单准许投递——正是这一点让浏览器能经 `ctx.remote.$on` 收到它们：`cordis/request-run`（`{requestId, agentId, id, name, purpose}`——只有元数据，绝无代码）、`cordis/request-run-resolved`（`{requestId, outcome}`）、`dynamicCordisRunner/package`（`{id, name, rev}`），以及 `dynamicCordisRunner/retract`（`{id, rev}`）。后两者是对称的一对运行状态播报：每次全新启动与每次停止都播，与该包有没有浏览器半无关。
 
 ## 存储立场
