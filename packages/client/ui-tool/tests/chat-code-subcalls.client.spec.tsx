@@ -217,7 +217,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
   it('renders Cordis sub-calls with lifecycle titles over the generic variants', async () => {
     const parent = 'call-cordis'
     const subCalls = [
-      subCall(11, parent, 1, 'cordis_runtime_inspect', { what: 'temporary' }, '## Dynamic Packages'),
+      subCall(11, parent, 1, 'cordis_inspect_self', { pluginId: 'waitv-1' }, '## Dynamic Packages'),
       subCall(12, parent, 2, 'cordis_run', { id: 'dyn-2' }, 'Dynamic package dyn-2 is running'),
       subCall(13, parent, 3, 'cordis_undefine', { id: 'dyn-2' }, 'Dynamic package dyn-2 was discarded.'),
     ]
@@ -227,7 +227,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
 
     // Each run-control verb names its act and shows the package id; without the
     // owned titles all three would read "Tool call · cordis_run · dyn-2".
-    expect(nest.querySelector('[data-tool="cordis_runtime_inspect"]')?.textContent).toContain('Inspect')
+    expect(nest.querySelector('[data-tool="cordis_inspect_self"]')?.textContent).toContain('Inspect')
     expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis Plugindyn-2')
     expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis Plugindyn-2')
     // None of them is a code row: the program belongs to cordis_define, whose
