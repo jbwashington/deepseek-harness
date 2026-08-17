@@ -40,7 +40,9 @@ describe('tool-call-model', () => {
     expect(classifyTool('grep')).toBe('search')
     expect(classifyTool('write')).toBe('write')
     expect(classifyTool('edit')).toBe('edit')
-    expect(classifyTool('cordis_runtime_inspect')).toBe('read')
+    expect(classifyTool('cordis_inspect_list')).toBe('read')
+    expect(classifyTool('cordis_inspect_query')).toBe('read')
+    expect(classifyTool('cordis_inspect_self')).toBe('read')
     // The v3 run-control verbs: `others` is the decided intent, not an
     // unclassified default (there is no program to show and no file to open).
     expect(classifyTool('cordis_run')).toBe('others')
@@ -173,13 +175,13 @@ describe('tool-call-model', () => {
   })
 
   it('gives Cordis lifecycle tools action titles over their generic variants', () => {
-    expect(toolRowModel('cordis_runtime_inspect', running({
-      name: 'cordis_runtime_inspect',
-      argsRaw: '{"what":"api","name":"tools"}',
+    expect(toolRowModel('cordis_inspect_self', running({
+      name: 'cordis_inspect_self',
+      argsRaw: '{"pluginId":"waitv-1","packageId":"pkg-3"}',
     }))).toMatchObject({
       variant: 'read',
       title: 'Inspect',
-      summary: 'api',
+      summary: 'waitv-1',
     })
     expect(toolRowModel('cordis_run', running({
       name: 'cordis_run',

@@ -107,7 +107,7 @@ describe('keyed toolview hole through the real machinery', () => {
 
   it('renders top-level Cordis calls with lifecycle titles over the generic variants', async () => {
     const b = await bench([
-      toolResult(3, 'cordis-1', 'cordis_runtime_inspect', '{"what":"api","name":"tools"}'),
+      toolResult(3, 'cordis-1', 'cordis_inspect_query', '{"platform":"host","provider":"Service","method":"listService"}'),
       toolResult(4, 'cordis-2', 'cordis_run', '{"id":"dyn-2"}'),
       toolResult(5, 'cordis-3', 'cordis_stop', '{"id":"dyn-2"}'),
       toolResult(6, 'cordis-4', 'cordis_undefine', '{"id":"dyn-2"}'),
@@ -118,7 +118,7 @@ describe('keyed toolview hole through the real machinery', () => {
     // names its act and carries the package id rather than falling back to the
     // generic "Tool call · <name> · <id>" row.
     const rowText = (name: string) => view.container.querySelector(`[data-tool="${name}"]`)?.textContent
-    expect(rowText('cordis_runtime_inspect')).toContain('Inspect')
+    expect(rowText('cordis_inspect_query')).toContain('Inspect')
     expect(rowText('cordis_run')).toContain('Run Cordis Plugindyn-2')
     expect(rowText('cordis_stop')).toContain('Stop Cordis Plugindyn-2')
     expect(rowText('cordis_undefine')).toContain('Remove Cordis Plugindyn-2')

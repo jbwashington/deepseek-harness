@@ -124,7 +124,8 @@ export const SERVICE_PAGE: Record<string, string> = {
  * plugin provides it and `inject` cannot reach it. A client-face key belongs to
  * the browser Context, which this host-face program never sees; the browser
  * surface has its own generated catalog (`scripts/gen-client-catalog.ts`, served
- * to a model as `cordis_runtime_inspect what:"client"`).
+ * to a model through the client-platform Inspect Providers that
+ * `cordis_inspect_list` names and `cordis_inspect_query` reads).
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   agent: 'not a service: the DX accessor field on Agent.ctx (root accessor defaulting to undefined) — docs/subsystems/core.md owns the Agent handle',

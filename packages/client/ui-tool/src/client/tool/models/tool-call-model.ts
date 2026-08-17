@@ -47,8 +47,9 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   write: 'write',
   edit: 'edit',
   run_code: 'code',
-  cordis_package_inspect: 'read',
-  cordis_runtime_inspect: 'read',
+  cordis_inspect_list: 'read',
+  cordis_inspect_query: 'read',
+  cordis_inspect_self: 'read',
   // The three run-control verbs take one package id and produce a receipt, so
   // the generic row is the decided intent, not an unclassified default: there is
   // no program to show (that is `cordis_define`'s card) and no file to open. The
@@ -60,8 +61,9 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
 
 /** Tool-owned titles that refine a generic row variant without replacing it. */
 const TOOL_TITLES: Record<string, string> = {
-  cordis_package_inspect: 'Inspect',
-  cordis_runtime_inspect: 'Inspect',
+  cordis_inspect_list: 'Inspect',
+  cordis_inspect_query: 'Inspect',
+  cordis_inspect_self: 'Inspect',
   cordis_run: 'Run Cordis Plugin',
   cordis_stop: 'Stop Cordis Plugin',
   cordis_undefine: 'Remove Cordis Plugin',

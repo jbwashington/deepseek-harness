@@ -411,10 +411,41 @@ describe('dynamic runner dispatch', () => {
     const receipt = await runner.run(AGENT_A, pluginId, packageId, 'run')
 
     expect(receipt).toMatchObject({ ok: false, reason: 'host-half-failed' })
+    if (receipt.ok) throw new Error('the broken package must not start')
+    expect(receipt.message).toContain('host half exploded')
+    expect(receipt.message).not.toContain('cordis_stop')
     expect(gateway.events).toEqual([])
     expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
     await expect(runner.invoke(pluginId, 'run-1' as never, 'never', null))
       .resolves.toMatchObject({ code: 'plugin-not-running' })
+  })
+
+  // Every registry words its own collision, and only the tool registry's
+  // wording is reachable from a live composition (composition.spec.ts covers
+  // that one). These two are the registries a dynamic package reaches whose
+  // rejections read nothing like "already registered", so a phrase match on
+  // that one wording leaves the Agent with a bare conflict and no recipe.
+  it.each([
+    ['webserver: duplicate prefix route "/waitv/stream"'],
+    ['service "waitv" has been registered at <cordis-dynamic>'],
+  ])('teaches the collision recipe when the host half rejects with %s', async (failure) => {
+    const { runner } = await setup()
+    const { pluginId, packageId } = define(runner, {
+      sessionId: AGENT_A.id,
+      name: 'collider',
+      purpose: 'p',
+      host: `return { name: 'collider', apply() { throw new Error(${JSON.stringify(failure)}) } }`,
+    })
+
+    const receipt = await runner.run(AGENT_A, pluginId, packageId, 'run')
+
+    expect(receipt).toMatchObject({ ok: false, reason: 'host-half-failed' })
+    if (receipt.ok) throw new Error('the collider package must not start')
+    expect(receipt.message).toContain(failure)
+    expect(receipt.message).toContain('cordis_stop that run')
+    expect(receipt.message).toContain('cordis_inspect_self')
+    expect(receipt.message).toContain('another Session')
+    expect(receipt.message).toContain('ctx.effect')
   })
 })
 
